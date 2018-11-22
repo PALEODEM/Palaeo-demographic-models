@@ -9,7 +9,7 @@ for(N in 1:1000) cor[N]<-cor.test(T,out[,1+N],method='spearman')$estimate
 test<-out[,c(1,1+order(cor))]
 
 # Then compute average N itterations and the overall average and compute difference
-# Doint this for between 4 itterations and however many are contained in the input data
+# Do this for between 4 itterations and the number of bootstrap itterations contained in the input data
 
 conv<-c(); nc<-ncol(test)-1
 T<-apply(test[,2:nc+1],na.rm=T,FUN=median,MARGIN=1)
