@@ -17,10 +17,10 @@ import pickle
 #input_file_0="./Simulations/SPD_Mediterranean_ConfidenceIntervals.pkl"
 #input_file_0="./Simulations/SPD_Interior_ConfidenceIntervals.pkl"
 #input_file_0="./Simulations/SPD_Atlantic_ConfidenceIntervals.pkl"
-input_file_0="./Simulations/SPD_All_ConfidenceIntervals.pkl"
+input_file_0="./Simulations/SPD_Iberia_ConfidenceIntervals.pkl"
 
 # Input data file name
-input_file_1="./Simulations/All_exponential_bootstrap_07_11.pkl"
+input_file_1="./Simulations/Iberia_exponential_bootstrap.pkl"
 
 
 # Output data file name
@@ -29,6 +29,7 @@ input_file_1="./Simulations/All_exponential_bootstrap_07_11.pkl"
 #output_file="./Plots/Mediterranean_exponential_nullmodel.pdf"
 #output_file="./Plots/All_exponential_nullmodel_prova.pdf"
 #output_file="./Plots/All_exponential_nullmodel_pvalue.pdf"
+output_file="./Plots/Iberia_exponential_nullmodel_pvalue.pdf"
 
 
 # Importing boostrap files
