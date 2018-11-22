@@ -2,7 +2,8 @@
 ## File name: model_selection.R
 ## Author: Fabio Silva
 ## Date created: 25/10/2017
-## R version 3.4.2
+## Date modified: 22/10/2018
+## R version 3.5.0
 ## Description: This code does regression fitting for the six models considered
 ## over a range of values of the breakpoints and uses the information-theoretic 
 ## approach of Burnham and Anderson (2002) to identify the model that best-fits
@@ -24,13 +25,13 @@ registerDoParallel(cl); getDoParWorkers()
 
 
 # Load SPD Data ---------------------------------------------------------------
-data <- read.csv('./Data/SPD_All_ConfidenceIntervals.csv', sep=';', header=F)
+data <- read.csv('./data/SPD_All_ConfidenceIntervals.csv', sep=';', header=F)
 aux <- t(as.matrix(data))
 data <- data.frame(x=-t(as.matrix(data))[,1], y=t(as.matrix(data))[,4])
 
 
 # Choose Breakpoint Values ----------------------------------------------------
-bp0 <- -14800
+bp0 <- -16600
 bp1 <- -12900
 bp2 <- -10200
 
@@ -53,9 +54,10 @@ dev.print(device=png, filename="SPD_breakpoints.png", width=12, height=6, units=
 
 # Parallel Runs of Model Regression Fitting -----------------------------------
 res <- foreach (j = 1:NROW(br1), .combine=rbind) %dopar% {
+# for (j in 24:NROW(br1)) {
+#  cat(paste0(j,'\n'))
   out <- rep(NA, 17)
   for (k in 1:NROW(br2)) {
-    
     ## Model A: Single Exponential
     start <- bp0; end <- -8000
     aux <- subset(data, x>=start & x<=end)
@@ -63,74 +65,77 @@ res <- foreach (j = 1:NROW(br1), .combine=rbind) %dopar% {
     K <- 3; n <- NROW(aux); logL<- as.numeric(logLik(modA))
     AICc.A <- -2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.A <- -2*logL + K * log(n)
     
-    ## Model B: Dual Exponential
+    
+    ## Model B: Single Logistic
+    start <- bp0; end <- -8000
+    aux <- subset(data, x>=start & x<=end)
+    modB <- nlsLM(y~ SSlogisX(x, A, xmid, s, ysc), data=aux, start=list(A=0.00012, xmid=-10000, s=100, ysc=0.00001), control=nls.lm.control(maxiter=1000, maxfev=5000))
+    K <- 5; n <- NROW(aux); logL <- as.numeric(logLik(modB))
+    AICc.B <- - 2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.B <- - 2*logL + K * log(n)
+    
+    
+    ## Model C: Dual Exponential
     start <- bp0; end <- br1[j]
     aux <- subset(data, x>=start & x<=end)
-    modB1 <- nlsLM(y~fexp(x, a, b, 0), data=aux, start=list(b=0.00001, a=0.001), control=nls.lm.control(maxiter=1000, maxfev=5000))
-    K <- 3; n <- NROW(aux); logL <- as.numeric(logLik(modB1))
-    AICc.B1 <- -2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.B1 <- -2*logL + K * log(n)
+    modC1 <- nlsLM(y~fexp(x, a, b, 0), data=aux, start=list(b=0.00001, a=0.001), control=nls.lm.control(maxiter=1000, maxfev=5000))
+    K <- 3; n <- NROW(aux); logL <- as.numeric(logLik(modC1))
+    AICc.C1 <- -2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.C1 <- -2*logL + K * log(n)
     
     start <- br1[j]+1; end <- -8000
     aux <- subset(data, x>=start & x<=end)
-    modB2 <- nlsLM(y~fexp(x, a, b, 0), data=aux, start=list(b=0.001, a=1), control=nls.lm.control(maxiter=1000, maxfev=5000))
-    K <- 3; n <- NROW(aux); logL <- as.numeric(logLik(modB2))
-    AICc.B <- AICc.B1 - 2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.B <- BIC.B1 - 2*logL + K * log(n)
+    modC2 <- nlsLM(y~fexp(x, a, b, 0), data=aux, start=list(b=0.001, a=1), control=nls.lm.control(maxiter=1000, maxfev=5000))
+    K <- 3; n <- NROW(aux); logL <- as.numeric(logLik(modC2))
+    AICc.C <- AICc.C1 - 2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.C <- BIC.C1 - 2*logL + K * log(n)
     
-    ## Model C: Mixed Exponential + Logistic
-    modC1 <- modB1
-    AICc.C <- AICc.B1; BIC.C <- BIC.B1
+    
+    ## Model D: Mixed Exponential + Logistic
+    modD1 <- modC1
+    AICc.D <- AICc.C1; BIC.D <- BIC.C1
     
     start <- br1[j]+1; end <- -8000
     aux <- subset(data, x>=start & x<=end)
-    modC2 <- nlsLM(y~ SSlogisX(x, A, xmid, s, ysc), data=aux, start=list(A=0.00012, xmid=-10000, s=100, ysc=0.00001), control=nls.lm.control(maxiter=1000, maxfev=5000))
-    K <- 5; n <- NROW(aux); logL <- as.numeric(logLik(modC2))
-    AICc.C <- AICc.C - 2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.C <- BIC.C - 2*logL + K * log(n)
+    modD2 <- nlsLM(y~ SSlogisX(x, A, xmid, s, ysc), data=aux, start=list(A=0.00012, xmid=-10000, s=100, ysc=0.00001), control=nls.lm.control(maxiter=1000, maxfev=5000))
+    K <- 5; n <- NROW(aux); logL <- as.numeric(logLik(modD2))
+    AICc.D <- AICc.D - 2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.D <- BIC.D - 2*logL + K * log(n)
     
-    ## Model D: Triple Exponential
-    modD1 <- modB1
-    AICc.D <- AICc.B1; BIC.D <- BIC.B1
+    
+    ## Model E: Mixed Exp + Exp w/baseline + Exp
+    modE1 <- modC1
+    AICc.E <- AICc.C1; BIC.E <- BIC.C1
     
     start <- br1[j]+1; end <- br2[k]
     aux <- subset(data, x>=start & x<=end)
-    # tries different starting values
-    modD2.a <- try(nlsLM(y~fexp(x, a, b, 0), data=aux, start=list(b=-0.0001, a=0.001), control=nls.lm.control(maxiter=1000, maxfev=5000)))
-    modD2.b <- try(nlsLM(y~fexp(x, a, b, 0), data=aux, start=list(b=-0.001, a=0.001), control=nls.lm.control(maxiter=1000, maxfev=5000)))
-    if (class(modD2.a)!='try-error') { modD2 <- modD2.a } else if (class(modD2.b)!='try-error') { modD2 <- modD2.b } else { stop() }
-    K <- 3; n <- NROW(aux); logL <- as.numeric(logLik(modD2))
-    AICc.D <- AICc.D - 2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.D <- BIC.D - 2*logL + K * log(n)
+    modE2 <- try(nlsLM(y~fexp(x, a, b, y0), data=aux, start=list(b=-0.0001, a=0.0001, y0=0), control=nls.lm.control(maxiter=1000, maxfev=5000), upper=c(0,Inf,Inf)), silent=T)
+    if (class(modE2)=='try-error') {  modE2 <- try(nlsLM(y~fexp(x, a, b, y0), data=aux, start=list(b=-0.00001, a=0.0001, y0=0), control=nls.lm.control(maxiter=1000, maxfev=5000), upper=c(0,Inf,Inf)), silent=T) }
+    if (class(modE2)=='try-error') {  modE2 <- try(nlsLM(y~fexp(x, a, b, y0), data=aux, start=list(b=-0.000001, a=0.0001, y0=0), control=nls.lm.control(maxiter=1000, maxfev=5000), upper=c(0,Inf,Inf)), silent=T) }
+    
+    if (class(modE2)=='try-error') { AICc.E2 <- NA } else {
+      K <- 4; n <- NROW(aux); logL <- as.numeric(logLik(modE2))
+      AICc.E2 <- - 2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.E2 <- - 2*logL + K * log(n)
+    }
+    AICc.E <- AICc.E + AICc.E2; BIC.E <- BIC.E + BIC.E2
     
     start <- br2[k]+1; end <- -8000
     aux <- subset(data, x>=start & x<=end)
-    modD3 <- nlsLM(y~fexp(x, a, b, 0), data=aux, start=list(b=0.0001, a=0.001), control=nls.lm.control(maxiter=1000, maxfev=5000))
-    K <- 3; n <- NROW(aux); logL <- as.numeric(logLik(modD3))
-    AICc.D3 <- - 2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.D3 <- - 2*logL + K * log(n)
-    AICc.D <- AICc.D + AICc.D3; BIC.D <- BIC.D + BIC.D3
-    
-    ## Model E: Mixed Exp + Exp w/baseline + Exp
-    modE1 <- modB1
-    AICc.E <- AICc.B1; BIC.E <- BIC.B1
-    
-    start <- br1[j]+1; end <- br2[k]
-    aux <- subset(data, x>=start & x<=end)
-    modE2 <- nlsLM(y~fexp(x, a, b, y0), data=aux, start=list(b=-0.000001, a=0.0001, y0=0), control=nls.lm.control(maxiter=1000, maxfev=5000))
-    K <- 4; n <- NROW(aux); logL <- as.numeric(logLik(modE2))
+    modE3 <- nlsLM(y~fexp(x, a, b, 0), data=aux, start=list(b=0.001, a=1), control=nls.lm.control(maxiter=1000, maxfev=5000))
+    K <- 3; n <- NROW(aux); logL <- as.numeric(logLik(modE3))
     AICc.E <- AICc.E - 2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.E <- BIC.E - 2*logL + K * log(n)
     
-    modE3 <- modD3
-    AICc.E <- AICc.E + AICc.D3; BIC.E <- BIC.E + BIC.D3
     
-    ## Model F: Mixed Exp + Log + Exp
-    modF1 <- modB1
-    AICc.F <- AICc.B1; BIC.F <- BIC.B1
+    ## Model F: Mixed Exp + Exp w/baseline + Logistic
+    modF1 <- modC1
+    AICc.F <- AICc.C1; BIC.F <- BIC.C1
     
-    start <- br1[j]+1; end <- br2[k]
+    modF2 <- modE2
+    AICc.F <- AICc.F + AICc.E2; BIC.F <- BIC.F + BIC.E2; 
+    
+    start <- br2[k]+1; end <- -8000
     aux <- subset(data, x>=start & x<=end)
-    modF2 <- nlsLM(y~flog(x, a, b, y0), data=aux, start=list(b=-br1[j], a=-0.00001, y0=0), control=nls.lm.control(maxiter=1000, maxfev=5000))
-    K <- 4; n <- NROW(aux); logL <- as.numeric(logLik(modF2))
+    modF3 <- nlsLM(y~ SSlogisX(x, A, xmid, s, ysc), data=aux, start=list(A=0.00012, xmid=-10000, s=100, ysc=0.00001), control=nls.lm.control(maxiter=1000, maxfev=5000))
+    K <- 5; n <- NROW(aux); logL <- as.numeric(logLik(modF3))
     AICc.F <- AICc.F - 2*logL + 2*K + 2*K*(n/(n-K-1)); BIC.F <- BIC.F - 2*logL + K * log(n)
     
-    modF3 <- modD3
-    AICc.F <- AICc.F + AICc.D3; BIC.F <- BIC.F + BIC.D3
+    
     
     
     ## Save Model Selection Indices

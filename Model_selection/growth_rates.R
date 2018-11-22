@@ -1,8 +1,8 @@
 ##
 ## File name: growth_rates.R
 ## Author: Fabio Silva
-## Date created: 25/10/2017
-## R version 3.4.2
+## Date created: 25/10/2018
+## R version 3.5.0
 ## Description: This code computes the mean growth rate and associated 
 ## confidence envelope for the model that best-fits the SPD, over the 
 ## entire range of breakpoint values.
@@ -22,19 +22,19 @@ registerDoParallel(cl); getDoParWorkers()
 
 
 # Load SPD Data ---------------------------------------------------------------
-data <- read.csv('./Data/SPD_All_ConfidenceIntervals.csv', sep=';', header=F)
+data <- read.csv('./data/SPD_All_ConfidenceIntervals.csv', sep=';', header=F)
 aux <- t(as.matrix(data))
 data <- data.frame(x=-t(as.matrix(data))[,1], y=t(as.matrix(data))[,4])
 
 
 # Choose Breakpoint Values ----------------------------------------------------
-bp0 <- -14800
+bp0 <- -16600
 bp1 <- -12900
 bp2 <- -10200
 
 # Creates a range of 'extra' years on either side of breakpoint, every 'res' years
 extra <- 150
-res <- 10
+res <- 2
 br1 <- seq(bp1 - extra, bp1 + extra, res)
 br2 <- seq(bp2 - extra, bp2 + extra, res)
 
@@ -43,35 +43,41 @@ br2 <- seq(bp2 - extra, bp2 + extra, res)
 xxx <<- seq(bp0,-8000)
 
 gr <- foreach (j = 1:NROW(br1), .combine=cbind) %dopar% {
-  gr <- matrix(NA, 7+length(xxx), NROW(br2))
+  gr <- matrix(NA, 9+length(xxx), NROW(br2))
   for (k in 1:NROW(br2)) {
     aux2 <- matrix(NA, length(xxx), 1)
     
-    ## Model E: Mixed Exp + Exp w/baseline + Exp
+    ## Model F: Mixed Exp + Exp w/baseline + Logistic
     start <- bp0; end <- br1[j]
     aux <- subset(data, x>=start & x<=end)
-    modE1 <- nlsLM(y~fexp(x, a, b, 0), data=aux, start=list(b=0.00001, a=0.001), control=nls.lm.control(maxiter=1000, maxfev=5000))
-    ind <- which(xxx >= start & xxx <= end); aux2[ind] <- (exp(coefficients(modE1)[1])-1)*100
+    modF1 <- nlsLM(y~fexp(x, a, b, 0), data=aux, start=list(b=0.00001, a=0.001), control=nls.lm.control(maxiter=1000, maxfev=5000))
+    ind <- which(xxx >= start & xxx <= end); aux2[ind] <- (exp(coefficients(modF1)[1])-1)*100
 
     start <- br1[j]+1; end <- br2[k]
     aux <- subset(data, x>=start & x<=end)
-    modE2 <- nlsLM(y~fexp(x, a, b, y0), data=aux, start=list(b=-0.000001, a=0.0001, y0=0), control=nls.lm.control(maxiter=1000, maxfev=5000))
+    modF2 <- try(nlsLM(y~fexp(x, a, b, y0), data=aux, start=list(b=-0.0001, a=0.0001, y0=0), control=nls.lm.control(maxiter=1000, maxfev=5000)), silent=T)
+    if (class(modF2)=='try-error') {  modF2 <- try(nlsLM(y~fexp(x, a, b, y0), data=aux, start=list(b=-0.00001, a=0.0001, y0=0), control=nls.lm.control(maxiter=1000, maxfev=5000)), silent=T) }
+    if (class(modF2)=='try-error') {  modF2 <- nlsLM(y~fexp(x, a, b, y0), data=aux, start=list(b=-0.001, a=0.0001, y0=0), control=nls.lm.control(maxiter=1000, maxfev=5000)) }
     ind <- which(xxx >= start & xxx <= end)
-    x <- seq(2,NROW(aux),1); yp <- predict(modE2, newdata = list(x=seq(start,end,1))); aux2[ind] <- c(NA,extractGrowthRate(x,yp))
+    x <- seq(2,NROW(aux),1); yp <- predict(modF2, newdata = list(x=seq(start,end,1))); aux2[ind] <- c(NA,extractGrowthRate(x,yp))
     
     start <- br2[k]+1; end <- -8000
     aux <- subset(data, x>=start & x<=end)
-    modE3 <- nlsLM(y~fexp(x, a, b, 0), data=aux, start=list(b=0.0001, a=0.001), control=nls.lm.control(maxiter=1000, maxfev=5000))
-    ind <- which(xxx >= start & xxx <= end); aux2[ind] <- (exp(coefficients(modE3)[1])-1)*100
+    modF3 <- nlsLM(y~ SSlogisX(x, A, xmid, s, ysc), data=aux, start=list(A=0.00012, xmid=-10000, s=100, ysc=0.00001), control=nls.lm.control(maxiter=1000, maxfev=5000))
+    ind <- which(xxx >= start & xxx <= end)
+    x <- seq(2,NROW(aux),1); yp <- predict(modF3, newdata = list(x=seq(start,end,1))); aux2[ind] <- c(NA,extractGrowthRate(x,yp))
     
     ## Save regression coefficients
-    gr[,k] <- c(coefficients(modE1), coefficients(modE2), coefficients(modE3), aux2)
+    gr[,k] <- c(coefficients(modF1), coefficients(modF2), coefficients(modF3), aux2)
   }
   gr
 }
 stopCluster(cl)
-cc <- gr[1:7,]
-gr <- gr[8:NROW(gr),]
+cc <- gr[1:9,]
+gr <- gr[10:NROW(gr),]
+
+## Save results for later use
+save.image('growthRate_results.RData')
 
 
 # Extract Growth Rate and Pop Proxy Uncertainties -----------------------------
@@ -102,41 +108,42 @@ for (i in 1:NROW(br1)) {
     pp <- cbind(cc[3,k], cc[4,k], cc[5,k])
     pop.phase2[ind2,k] <- fexp(aux, pp[2], pp[1], pp[3])
     start <- br2[j]+1; end <- -8000; aux <- rev(subset(data, x>=start & x<=end)$x)
-    pp <- cbind(cc[6,k], cc[7,k])
-    pop.phase3[ind3,k] <- fexp(aux, pp[2], pp[1], 0)
+    pp <- cbind(cc[6,k], cc[7,k], cc[8,k], cc[9,k])
+    pop.phase3[ind3,k] <- flogis(aux, pp[1], pp[2], pp[3], pp[4])
     
     k <- k + 1
   }
 }
 
-
+rm(gr)
+gc()
 
 # Plot Means and Confidence Envelopes -----------------------------------------
 ## Regressions Fits
-par(mfrow=c(2,1)); par(mar=c(4,4,2,2))
-plot(data, type='l', xlim=c(-15000,-8000), xlab='Calendar Age (BP)', ylab='Density', main='', axes=F)
+par(mfrow=c(2,1), mar=c(4,4,2,2), xaxs='i', yaxs='i')
+plot(data, type='l', xlim=c(-18000,-8000), xlab='Calendar Age (BP)', ylab='Density', main='', axes=F)
 ll <- seq(18000,8000,-1000); for (i in seq(2,NROW(ll),2)) { ll[i] <- "" }
 axis(1, at=seq(-18000,-8000,1000), labels=ll); axis(2); box()
 polygon(c(min(br1),max(br1),max(br1),min(br1)), c(-1,-1,1,1), border=NA, col=MESS::col.alpha('grey',0.3))
 polygon(c(min(br2),max(br2),max(br2),min(br2)), c(-1,-1,1,1), border=NA, col=MESS::col.alpha('grey',0.3))
 
-plotCI(xxx, pop.phase1, 'blue', level=.95); text(mean(xxx[which(!is.na(pop.phase1))], na.rm=T), 0.000025, labels='Phase 1', col='blue')
-plotCI(xxx, pop.phase2, 'red', level=.95); text(mean(xxx[which(!is.na(pop.phase2))], na.rm=T), 0.000025, labels='Phase 2', col='red')
-plotCI(xxx, pop.phase3, 'darkgreen', level=.95); text(mean(xxx[which(!is.na(pop.phase3))], na.rm=T), 0.000025, labels='Phase 3', col='darkgreen')
+plotCI(xxx, pop.phase1, 'blue', level=.95); text(mean(xxx[which(!is.na(pop.phase1))], na.rm=T), 0.000025, labels='Phase 1', col='blue', cex=1.5)
+plotCI(xxx, pop.phase2, 'red', level=.95); text(mean(xxx[which(!is.na(pop.phase2))], na.rm=T), 0.000025, labels='Phase 2', col='red', cex=1.5)
+plotCI(xxx, pop.phase3, 'darkgreen', level=.95); text(mean(xxx[which(!is.na(pop.phase3))], na.rm=T), 0.000025, labels='Phase 3', col='darkgreen', cex=1.5)
 
 ## Growth Rates
-plot(-100,-100,  xlim=c(-15000,-8000), xlab='Calendar Age (BP)', ylab='Annual Growth Rate', main='', ylim=c(-0.05,0.13), axes=F)
+plot(-100,-100,  xlim=c(-18000,-8000), xlab='Calendar Age (BP)', ylab='Annual Growth Rate', main='', ylim=c(-0.15,0.25), axes=F)
 ll <- seq(18000,8000,-1000); for (i in seq(2,NROW(ll),2)) { ll[i] <- "" }
-axis(1, at=seq(-18000,-8000,1000), labels=ll); axis(2, at=seq(-0.06,0.16,0.02)); box()
+axis(1, at=seq(-18000,-8000,1000), labels=ll); axis(2, at=seq(-0.5,0.5,0.02)); box()
 polygon(c(min(br1),max(br1),max(br1),min(br1)), c(-1,-1,1,1), border=NA, col=MESS::col.alpha('grey',0.3))
 polygon(c(min(br2),max(br2),max(br2),min(br2)), c(-1,-1,1,1), border=NA, col=MESS::col.alpha('grey',0.3))
 abline(h=0)
 
 litGrowthRates() ## values from the literature
 
-plotCI(xxx, gr.phase1, 'blue', level=.95); text(mean(xxx[which(!is.na(gr.phase1))], na.rm=T), 0.01, labels='Phase 1', col='blue')
-plotCI(xxx, gr.phase2, 'red', level=.95); text(mean(xxx[which(!is.na(gr.phase2))], na.rm=T), 0.01, labels='Phase 2', col='red')
-plotCI(xxx, gr.phase3, 'darkgreen', level=.95); text(mean(xxx[which(!is.na(gr.phase3))], na.rm=T), 0.01, labels='Phase 3', col='darkgreen')
+plotCI(xxx, gr.phase1, 'blue', level=.95); text(mean(xxx[which(!is.na(gr.phase1))], na.rm=T), 0.01, labels='Phase 1', col='blue', cex=1.5)
+plotCI(xxx, gr.phase2, 'red', level=.95); text(mean(xxx[which(!is.na(gr.phase2))], na.rm=T), 0.01, labels='Phase 2', col='red', cex=1.5)
+plotCI(xxx, gr.phase3, 'darkgreen', level=.95); text(mean(xxx[which(!is.na(gr.phase3))], na.rm=T), 0.01, labels='Phase 3', col='darkgreen', cex=1.5)
 
 dev.print(device=png, filename="Growth_Rates_uncertainty.png", width=12, height=14, units='in', res=300)
 
@@ -146,8 +153,5 @@ rownames(grRates) <- c('Phase 1', 'Phase 2', 'Phase 3')
 colnames(grRates) <- c('min','max')
 grRates
 
-
-## Save results for later use
-save.image('growthRate_results.RData')
 
 

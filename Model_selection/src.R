@@ -15,10 +15,14 @@ fexp = function(x, a, b, y0){
 
 # Logarithm for regression fitting --------------------------------------
 flog <- function(x, a, b, y0){
-  aux <- a*log(x+b)+y0
-  return(aux)
+  return(a*log(x+b)+y0)
 }
 
+
+# Logistic function --------------------------------------
+flogis <- function(x, Asym, xmid, scal, yscal){
+  return(Asym/(1 + exp((xmid - x)/scal)) + yscal)
+}
 
 # Self-Starter for Logistic Regression --------------------------------------
 SSlogisX <- selfStart(~ Asym/(1 + exp((xmid1 - x)/scal1)) + yscal,
@@ -77,11 +81,6 @@ litGrowthRates = function(){
   xx <- c(Silva_WMed$x[1], Silva_WMed$x[1], Silva_WMed$x[2], Silva_WMed$x[2]); yy <- c(Silva_WMed$y[1], Silva_WMed$y[2], Silva_WMed$y[2], Silva_WMed$y[1])
   polygon(xx, yy, col='grey50', border=NA)
   text(min(Silva_WMed$x),max(Silva_WMed$y)+0.002,labels="Western Med Mesolithic", cex=0.8, col="black", pos=4)
-  
-  ## Goldberg et al 2016
-  Goldberg <- list(x=c(-14000,-5500), y=c(0.131, 0.131))  
-  lines(Goldberg$x, Goldberg$y, lwd=1, lty=3)
-  text(-8000,min(Goldberg$y)+0.002,labels="South America", cex=0.8, col="black", pos=2)
   
   ## Zahid et al 2015
   Zahid <- list(x=c(-13000,-6000), y=c(0.041-0.003,0.041+0.003))  
