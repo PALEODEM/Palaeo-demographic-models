@@ -44,3 +44,14 @@ This code takes the results of model_selection.R to plot the regression fits of 
 *growth_rates.R: 
 This code computes the mean growth rate and associated confidence envelope for the model that best-fits the SPD, over the entire range of breakpoint values.
 
+## 5.- Correlation with palaeoenvironmental proxy data 
+
+*proxy_correlation.r:
+
+This script plots a number of time series for environmental proxies against the bootstrapped SPD population proxies, and performs correlation testing using Spearman's rank correlation test.
+
+## 5.- Convergence analysis
+
+*convergence.r:
+
+This script calculates the average difference between the average spd (used as a population proxy) and subsets of the bootstrap itterations used to develop the confidence interval. The difference between these is used to demonstrate how many iterations of the bootstrapping process are required to achieve convergence. 
