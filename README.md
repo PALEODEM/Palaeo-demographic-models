@@ -50,6 +50,8 @@ This code computes the mean growth rate and associated confidence envelope for t
 
 This script plots a number of time series for environmental proxies against the bootstrapped SPD population proxies, and performs correlation testing using Spearman's rank correlation test.
 
+It also calculates the short-term variability of the palaeoenvironmental proxies by de-trending these timeseries and calculating the varience. 
+
 ## 6.- Convergence analysis
 
 *convergence.r:
