@@ -19,23 +19,25 @@ import pkg_resources
 import pickle
 
 # Input data file path 
-
-input_file="./Data/All_dataset_F2.csv"
+input_file="Data/Iberia.csv"
 
 # Output file name
-
-output_file="./Plots/SPD_All_taphonomic.pdf"
+output_file="Plots/SPD_Iberia.pdf"
 
 # Output file name 2 (pickle file)
+output_file_2="Simulations/SPD_Iberia.pkl"
 
-output_file_2="./Simulations/SPD_All.pkl"
-
-# Raw data taking some columns of the input file (fields should be delimited by ";")
+# Raw data taking some colums of the input file (fields should be delimited by ";")
 raw = np.genfromtxt(input_file, delimiter=";", names=True, usecols=("ID_date", "C14Age", "Std", "Type_site", "Marine", "Marine_err", "Reservoir", "Reservoir_err", "Filtered"), dtype=('|S16', float, float, '|S16', float, float, float, float, int), skip_footer=0)
 
 # Consider only the filtered dates 
 filtered = [[x[0], x[1], x[2], x[3]] for x in raw if x[4] == 0 and x[8] == 1]
 marinedates = [[x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]] for x in raw if x[4] > 0 and x[8] == 1]
+
+# Marine radiocarbon dates seggreated by site type 
+open_marine = [[x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]] for x in raw if (x[4] > 0 and x[8] == 1) and x[3].decode('utf-8') == "Open"]
+shelter_marine = [[x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]] for x in raw if x[4] > 0 and x[8] == 1 and x[3].decode('utf-8') == "Shelter"]
+cave_marine = [[x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]] for x in raw if x[4] > 0 and x[8] == 1 and x[3].decode('utf-8') == "Cave"]
 
 # Radiocarbon dates seggregated by site type
 open_dates = [iosacal.core.RadiocarbonDetermination(x[1], x[2], x[0]) for x in filtered if x[3].decode('utf-8') == "Open"]
@@ -47,26 +49,23 @@ calopen = [x.calibrate('intcal13', norm=True) for x in open_dates]
 calshelter = [x.calibrate('intcal13', norm=True) for x in shelter_dates]
 calcave = [x.calibrate('intcal13', norm=True) for x in cave_dates]
 
-# Calculate SPDs
-SPDopen = iosacal.core.SPD(calopen, norm=False)
-SPDshelter = iosacal.core.SPD(calshelter, norm=False)
-SPDcave = iosacal.core.SPD(calcave, norm=False)
 
-# Performs the taphonomic correction
-SPDopentaph = SPDopen.taphcorr(function='Surovell', factor=1)
-SPDsheltertaph = SPDshelter.taphcorr(function='Surovell', factor=0)
-SPDcavetaph = SPDcave.taphcorr(function='Surovell', factor=0)
+# Calculate SPDs and perform the taphonomic correction for atmospheric samples
+if len(calopen)>0:
+    SPDopen = iosacal.core.SPD(calopen, norm=False)
+    SPDopentaph = SPDopen.taphcorr(function='Surovell', factor=1)
+if len(calshelter)>0:
+    SPDshelter = iosacal.core.SPD(calshelter, norm=False)
+    SPDsheltertaph = SPDshelter.taphcorr(function='Surovell', factor=0)
+if len(calcave)>0:
+    SPDcave = iosacal.core.SPD(calcave, norm=False)
+    SPDcavetaph = SPDcave.taphcorr(function='Surovell', factor=0)
 
-# Performs the same analysis for marine dates
-if len(marinedates) == 0:
-    # Gets here in case there are no marine dates
-    # Sum all SPDs from different site types into one single SPD
-    SPDmixedtaph = iosacal.core.spdsum([SPDcavetaph, SPDsheltertaph, SPDopentaph])
-    SPDmixedtaph.ndates = SPDcavetaph.ndates + SPDsheltertaph.ndates + SPDopentaph.ndates
-else:
-    # Calibrate Marine dates
-    calmarine = []
-    for x in marinedates:
+# Performs the same analysis for marine dates, talking each taphanomic context in turn
+if len(open_marine)>0:
+    # Calibrate open marine dates
+    calopenmarine = []
+    for x in open_marine:
         r = iosacal.core.RadiocarbonDetermination(x[1], x[2], x[0])
         
         # Define the main calibration curve
@@ -79,17 +78,72 @@ else:
         calibration_curve.mixing("marine13", P=x[4], D=x[5], deltaR=x[6], err_deltaR=x[7])
         
         cal_r = r.calibrate(calibration_curve)
-        calmarine.append(cal_r)
+        calopenmarine.append(cal_r)
     
     # Calculates the SPD from the collection of calibrated marine dates
-    SPDmarine = iosacal.core.SPD(calmarine, norm=False)
+    SPDopenmarine = iosacal.core.SPD(calopenmarine, norm=False)
+    
+    # Taphonomic correction for marine dates from open sites
+    SPDopenmarinetaph = SPDopenmarine.taphcorr(function='Surovell', factor=1)
+
+if len(shelter_marine)>0:
+    # Calibrate Marine dates
+    calsheltermarine = []
+    for x in shelter_marine:
+        r = iosacal.core.RadiocarbonDetermination(x[1], x[2], x[0])
+        
+        # Define the main calibration curve
+        curve_name = "intcal13"
+        # Determine the path to the calibration curve file
+        curve_path = pkg_resources.resource_filename("iosacal", "data/%s.14c" % curve_name)
+        # CalibrationCurve format of iosacal
+        calibration_curve = iosacal.core.CalibrationCurve(curve_path)
+        # Mix it with secondary curve with a certain percentage P +/- D and Rerservoir effect deltaR +/- err_deltaR
+        calibration_curve.mixing("marine13", P=x[4], D=x[5], deltaR=x[6], err_deltaR=x[7])
+        
+        cal_r = r.calibrate(calibration_curve)
+        calsheltermarine.append(cal_r)
+    
+    # Calculates the SPD from the collection of calibrated marine dates
+    SPDsheltermarine = iosacal.core.SPD(calsheltermarine, norm=False)
     
     # Taphonomic correction for marine dates
-    SPDmarinetaph = SPDmarine.taphcorr(function='Surovell', factor=1)
+    SPDsheltermarinetaph = SPDsheltermarine.taphcorr(function='Surovell', factor=0)
+
+if len(cave_marine)>0:
+    # Calibrate Marine dates
+    calcavemarine = []
+    for x in cave_marine:
+        r = iosacal.core.RadiocarbonDetermination(x[1], x[2], x[0])
+        
+        # Define the main calibration curve
+        curve_name = "intcal13"
+        # Determine the path to the calibration curve file
+        curve_path = pkg_resources.resource_filename("iosacal", "data/%s.14c" % curve_name)
+        # CalibrationCurve format of iosacal
+        calibration_curve = iosacal.core.CalibrationCurve(curve_path)
+        # Mix it with secondary curve with a certain percentage P +/- D and Rerservoir effect deltaR +/- err_deltaR
+        calibration_curve.mixing("marine13", P=x[4], D=x[5], deltaR=x[6], err_deltaR=x[7])
+        
+        cal_r = r.calibrate(calibration_curve)
+        calcavemarine.append(cal_r)
     
-    # Sum all SPDs from different site types into one single SPD
-    SPDmixedtaph = iosacal.core.spdsum([SPDcavetaph, SPDsheltertaph, SPDopentaph, SPDmarinetaph])
-    SPDmixedtaph.ndates = SPDcavetaph.ndates + SPDsheltertaph.ndates + SPDopentaph.ndates + SPDmarinetaph.ndates
+    # Calculates the SPD from the collection of calibrated marine dates
+    SPDcavemarine = iosacal.core.SPD(calcavemarine, norm=False)
+    
+    # Taphonomic correction for marine dates
+    SPDcavemarinetaph = SPDcavemarine.taphcorr(function='Surovell', factor=0)
+
+
+# Sum all SPDs from different site types into one single SPD
+# Manually adjust these lines if certain SPDs were not calculated because there were no dates of that type in the input data
+# The full list of different spds are as follows:
+#   SPDmixedtaph = iosacal.core.spdsum([SPDcavetaph, SPDsheltertaph, SPDopentaph, SPDopenmarinetaph, SPDsheltermarinetaph, SPDcavemarinetaph])
+#   SPDmixedtaph.ndates = SPDcavetaph.ndates + SPDsheltertaph.ndates + SPDopentaph.ndates + SPDcavemarinetaph.ndates + SPDsheltermarinetaph.ndates + SPDopenmarinetaph.ndates
+
+SPDmixedtaph = iosacal.core.spdsum([SPDcavetaph, SPDsheltertaph, SPDopentaph, SPDopenmarinetaph, SPDsheltermarinetaph, SPDcavemarinetaph])
+SPDmixedtaph.ndates = SPDcavetaph.ndates + SPDsheltertaph.ndates + SPDopentaph.ndates + SPDcavemarinetaph.ndates + SPDsheltermarinetaph.ndates + SPDopenmarinetaph.ndates
+
 
 # Save final SPD curve into pickle file
 with open(output_file_2, 'wb') as output:
@@ -118,6 +172,10 @@ ax.xaxis.set_minor_locator(minorLocator)
 #plt.ylim(5e-6,5e-4)
 #plt.yscale('log')
 
+#This plots red and green vertical lines at 8240 and 9300
+#plt.plot([8240,8240], [0.0006,0], '-', linewidth=4, color='red')
+#plt.plot([9300,9300], [0.0006,0], '-', linewidth=4, color='green')
 
 plt.fill_between(SPDmixedtaph.T[0], SPDmixedtaph.T[1], facecolor="blue", alpha="0.25", edgecolor="none")
+plt.plot(SPDmixedtaph.T[0], SPDmixedtaph.T[1], '-', linewidth=1, color='black')
 plt.savefig(output_file, format='pdf')

@@ -17,12 +17,12 @@ import pkg_resources
 import pickle
 
 # Input data file path 
-
-input_file="./Data/All_dataset_F2.csv"
+input_file="Data/Iberia.csv"
 
 # Output file name
+output_file="Plots/SPD_Iberia_no_taph.pdf"
 
-output_file="./Plots/SPD_All.pdf"
+output_file_2="Simulations/SPD_Iberia_no_taph.pkl"
 
 # Raw data taking some colums of the input file (fields should be delimited by ";")
 raw = np.genfromtxt(input_file, delimiter=";", names=True, usecols=("ID_date", "C14Age", "Std", "Type_site", "Marine", "Marine_err", "Reservoir", "Reservoir_err", "Filtered"), dtype=('|S16', float, float, '|S16', float, float, float, float, int), skip_footer=0)
@@ -63,6 +63,10 @@ SPD = iosacal.core.SPD(cal_dates, norm=False)
 maxx = 18000
 minx = 7500
 
+# Save final SPD curve into pickle file
+with open(output_file_2, 'wb') as output:
+    pickle.dump(SPD, output, -1)
+
 # Plot script #
 
 import matplotlib.pyplot as plt
@@ -72,7 +76,7 @@ minorLocator = AutoMinorLocator()
 
 fig, ax = plt.subplots(figsize=(12,6))
 
-plt.tick_params(labelsize=14) 
+plt.tick_params(labelsize=14)
 plt.xlim(maxx,minx)
 plt.xlabel("Calendar Age (BP)", fontsize=14)
 plt.ylabel("Probability", fontsize=14)
@@ -87,4 +91,5 @@ ax.xaxis.set_minor_locator(minorLocator)
 #plt.plot([9300,9300], [0.0006,0], '-', linewidth=4, color='green')
 
 plt.fill_between(SPD.T[0], SPD.T[1], facecolor="blue", alpha="0.25", edgecolor="none")
+plt.plot(SPD.T[0], SPD.T[1], '-', linewidth=1, color='black')
 plt.savefig(output_file, format='pdf')

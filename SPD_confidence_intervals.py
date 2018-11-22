@@ -13,20 +13,17 @@ import iosacal
 import pickle
 
 # Input file 1 (Original SPD)
-
-input_file_1 = "./Simulations/SPD_All.pkl"
+input_file_1 = "Simulations/SPD_Iberia.pkl"
 
 # Input file 2 (collection of simulated SPDs)
-
-input_file_2 = "./Simulations/All_bootstrap.pkl"
+input_file_2 = "Simulations/SPD_Iberia_bootstrap.pkl"
 
 # Output file 1 (pickle file with confidence intervals)
-
-output_file_1 = "./Simulations/SPD_All_ConfidenceIntervals.pkl"
+output_file_1 = "Simulations/SPD_ConfidenceIntervals_Iberia.pkl"
 
 # Output file 2 (plot)
+output_file_2 = "Plots/SPD_ConfidenceIntervals_Iberia.pdf"
 
-output_file_2 = "./Plots/SPD_All_ConfidenceIntervals.pdf"
 
 with open(input_file_1, 'rb') as f:
     u = pickle._Unpickler(f)
@@ -64,7 +61,6 @@ ax.xaxis.set_minor_locator(minorLocator)
 plt.xlim(maxx,minx)
 plt.xlabel("Calendar Age (BP)", fontsize=18)
 plt.ylabel("Probability", fontsize=18)
-ax.set_yticklabels([])
 plt.fill_between(ci[0], ci[5], ci[1], facecolor='grey', alpha=0.25, edgecolor="none")
 plt.fill_between(ci[0], ci[4], ci[2], facecolor='grey', alpha=0.60, edgecolor="none")
 plt.plot(ci[0], ci[3], '-',  linewidth=2, color='black')
@@ -81,4 +77,5 @@ med = mlines.Line2D([], [], linewidth=2, color='black')
 
 plt.legend([ori, lci95, lci68, med], ["Original SPD", "Bootstrap 95.4% C.I.", "Bootstrap 68.2% C.I.", "Bootstrap Median"], loc=2)
 
-plt.savefig(output_file_2, format='pdf') 
+plt.savefig(output_file_2, format='pdf')
+ 
