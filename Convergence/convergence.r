@@ -3,7 +3,8 @@
 # 	storing the results in a new matrix called 'test'
 # The resulting convergence plot will therefore be of the 'worst case scenario' 
 
-cor<-c()
+out<-read.csv('Data/SPD_output.csv')
+cor<-c(); T<-out[,2]
 for(N in 1:1000) cor[N]<-cor.test(T,out[,1+N],method='spearman')$estimate
 
 test<-out[,c(1,1+order(cor))]
